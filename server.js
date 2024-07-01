@@ -51,4 +51,6 @@ connectDatabase().catch((error) => logger.error("Error connecting to the databas
 
 // Start the server
 const PORT = process.env.PORT || 5500;
-app.listen(PORT, () => logger.info(`Server running on port ${PORT}`));
+app.listen(PORT, () => {
+    logger.info(`Server running on port ${PORT}`);
+});
