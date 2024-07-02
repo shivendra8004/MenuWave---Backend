@@ -2,8 +2,10 @@ const bcrypt = require("bcryptjs");
 const { ZodError } = require("zod");
 const jwt = require("jsonwebtoken");
 const Admin = require("../models/admin/adminModel");
+const Vendor = require("../models/vendor/vendorModel");
 const adminValidationSchema = require("../models/admin/adminValidation");
 const logger = require("../logger/logger");
+const vendorValidationSchema = require("../models/vendor/vendorValidation");
 const generateToken = (id) => {
     return jwt.sign({ id, role: "admin" }, process.env.JWT_SECRET, { expiresIn: "1h" });
 };
@@ -88,6 +90,8 @@ exports.createAdmin = async (req, res) => {
         res.status(500).json({ ok: false, message: "Server error", error: error.message });
     }
 };
+
+// 3. Admin Login
 exports.adminLogin = async (req, res) => {
     try {
         const { username, email, password } = req.body;
@@ -127,7 +131,7 @@ exports.adminLogin = async (req, res) => {
         res.status(500).json({ ok: false, message: "Server error", error: error.message });
     }
 };
-
+// 4.Change Password
 exports.changePassword = async (req, res) => {
     try {
         const { currentPassword, newPassword } = req.body;
@@ -172,6 +176,121 @@ exports.changePassword = async (req, res) => {
                 })),
             });
         }
+        if (error.name === "ValidationError") {
+            return res.status(400).json({
+                ok: false,
+                message: "Validation error",
+                errors: Object.values(error.errors).map((err) => ({
+                    field: err.path,
+                    message: err.message,
+                })),
+            });
+        }
+        res.status(500).json({ ok: false, message: "Server error", error: error.message });
+    }
+};
+// 5. Create Vendor
+exports.createVendor = async (req, res) => {
+    try {
+        logger.log("Creating new vendor. Request user:", req.user);
+
+        const { username, email, phone, cin, address, password } = req.body;
+
+        // Check if vendor already exists
+        const existingVendor = await Vendor.findOne({ $or: [{ email }, { cin }] });
+        if (existingVendor) {
+            return res.status(400).json({ ok: false, message: "Vendor with this username and email already exists" });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 12);
+
+        const vendor = new Vendor({
+            username,
+            email,
+            cin,
+            phone,
+            address,
+            password: hashedPassword,
+        });
+
+        await vendor.save();
+
+        res.status(201).json({ ok: true, message: "New vendor created successfully" });
+    } catch (error) {
+        if (error instanceof ZodError) {
+            return res.status(400).json({
+                ok: false,
+                message: "Validation error",
+                errors: error.errors.map((err) => ({
+                    field: err.path.join("."),
+                    message: err.message,
+                })),
+            });
+        }
+        if (error.name === "ValidationError") {
+            return res.status(400).json({
+                ok: false,
+                message: "Validation error",
+                errors: Object.values(error.errors).map((err) => ({
+                    field: err.path,
+                    message: err.message,
+                })),
+            });
+        }
+        res.status(500).json({ ok: false, message: "Server error", error: error.message });
+    }
+};
+// 6. Update vendor
+exports.updateVendor = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { username, email, phone, address, status } = req.body;
+        // Find the vendor
+        const vendor = await Vendor.findById(id);
+        if (!vendor) {
+            return res.status(404).json({ ok: false, message: "Vendor not found" });
+        }
+        // Check if email is being changed and if it's already in use
+        if (email && email !== vendor.email) {
+            const existingVendor = await Vendor.findOne({ email });
+            if (existingVendor) {
+                return res.status(400).json({ ok: false, message: "Email already in use" });
+            }
+        }
+        // Update fields
+        if (username) vendor.name = username;
+        if (email) vendor.email = email;
+        if (phone) vendor.phone = phone;
+        if (address) vendor.address = address;
+        if (status && ["active", "disabled"].includes(status)) vendor.status = status;
+        // Validate the updated vendor
+        try {
+            vendorValidationSchema.partial().parse(vendor.toObject());
+        } catch (zodError) {
+            return res.status(400).json({
+                ok: false,
+                message: "Validation error",
+                errors: zodError.errors.map((err) => ({
+                    field: err.path.join("."),
+                    message: err.message,
+                })),
+            });
+        }
+        // Save the updated vendor
+        await vendor.save();
+        res.json({
+            ok: true,
+            message: "Vendor updated successfully",
+            vendor: {
+                id: vendor._id,
+                username: vendor.username,
+                email: vendor.email,
+                phone: vendor.phone,
+                address: vendor.address,
+                status: vendor.status,
+            },
+        });
+    } catch (error) {
         if (error.name === "ValidationError") {
             return res.status(400).json({
                 ok: false,

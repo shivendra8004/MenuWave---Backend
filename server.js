@@ -8,6 +8,8 @@ const compression = require("compression");
 const logger = require("./logger/logger");
 const connectDatabase = require("./database/db");
 const authRouter = require("./routers/authRoutes");
+const adminRouter = require("./routers/adminRoutes");
+const vendorRouter = require("./routers/vendorRoutes");
 const app = express();
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -41,7 +43,9 @@ app.use((err, req, res, next) => {
 });
 
 // Routes
-app.use("/v1/api/auth", authRouter);
+app.use("/v1/api/admin", adminRouter);
+app.use("/v1/api/vendor", vendorRouter);
+app.use("/v1/api/customers", authRouter);
 app.get("/", (req, res) => {
     res.status(200).json({ ok: true, message: "Welcome to the server!" });
 });

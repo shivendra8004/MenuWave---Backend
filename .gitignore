@@ -6,3 +6,7 @@
 node_modules
 /node_modules
 node_modules/
+
+# Logger files
+error.log
+combined.log

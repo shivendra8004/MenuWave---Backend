@@ -49,7 +49,7 @@ exports.adminOnlyAuth = async (req, res, next) => {
 
             try {
                 const admin = await Admin.findById(req.user._id);
-                if (admin && admin.isInitialAdmin) {
+                if (admin) {
                     next();
                 } else {
                     res.status(403).json({ ok: false, message: "Access denied. Admin only." });
