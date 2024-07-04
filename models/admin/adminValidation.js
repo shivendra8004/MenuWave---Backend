@@ -2,7 +2,7 @@ const { z } = require("zod");
 
 const adminValidationSchema = z.object({
     username: z.string().min(6, { message: "Username must be at least 6 characters long" }).max(50, { message: "Username must not exceed 50 characters" }),
-
+    role: z.string().default("admin"),
     email: z.string().email({ message: "Invalid email address" }),
 
     password: z

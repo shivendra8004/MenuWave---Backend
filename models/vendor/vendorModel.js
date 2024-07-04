@@ -9,6 +9,11 @@ const VendorSchema = new mongoose.Schema(
             minlength: 2,
             maxlength: 100,
         },
+        role: {
+            type: String,
+            default: "vendor",
+            required: true,
+        },
         email: {
             type: String,
             required: true,

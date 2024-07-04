@@ -7,7 +7,7 @@ const vendorValidationSchema = require("../models/vendor/vendorValidation");
 const logger = require("../logger/logger");
 
 const generateToken = (id) => {
-    return jwt.sign({ id, role: "vendor" }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    return jwt.sign({ id, role: "vendor" }, process.env.JWT_SECRET, { expiresIn: "15m" });
 };
 
 // Vendor Login

@@ -10,6 +10,11 @@ const AdminSchema = new mongoose.Schema(
             minlength: 6,
             maxlength: 50,
         },
+        role: {
+            type: String,
+            default: "admin",
+            required: true,
+        },
         email: {
             type: String,
             required: true,

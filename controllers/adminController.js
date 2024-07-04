@@ -7,7 +7,7 @@ const adminValidationSchema = require("../models/admin/adminValidation");
 const logger = require("../logger/logger");
 const vendorValidationSchema = require("../models/vendor/vendorValidation");
 const generateToken = (id) => {
-    return jwt.sign({ id, role: "admin" }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    return jwt.sign({ id, role: "admin" }, process.env.JWT_SECRET, { expiresIn: "15m" });
 };
 
 // 1. Create initial admin
@@ -116,7 +116,7 @@ exports.adminLogin = async (req, res) => {
         if (!(await bcrypt.compare(password, admin.password))) {
             return res.status(401).json({ ok: false, message: "Invalid password" });
         }
-        if (admin.isInitialAdmin && !admin.isPasswordChanged) {
+        if (!admin.isPasswordChanged) {
             return res.status(200).json({
                 ok: true,
                 message: "Please change your password",
@@ -131,7 +131,7 @@ exports.adminLogin = async (req, res) => {
         res.status(500).json({ ok: false, message: "Server error", error: error.message });
     }
 };
-// 4.Change Password
+// 4.Change Admin Password
 exports.changePassword = async (req, res) => {
     try {
         const { currentPassword, newPassword } = req.body;
@@ -328,6 +328,129 @@ exports.getAllVendors = async (req, res) => {
         });
     } catch (error) {
         logger.error("Error in getAllVendors:", error);
+        res.status(500).json({
+            ok: false,
+            message: "Server error",
+            error: error.message || "Unknown error occurred",
+        });
+    }
+};
+// 8. Delete Admin
+exports.deleteAdmin = async (req, res) => {
+    try {
+        logger.info(`Deleting admin. Request user: ${req.user.id}`);
+
+        const { id } = req.params;
+
+        // Prevent deleting the initial admin
+        const adminToDelete = await Admin.findById(id);
+        if (!adminToDelete) {
+            return res.status(404).json({ ok: false, message: "Admin not found" });
+        }
+        if (adminToDelete.isInitialAdmin) {
+            return res.status(403).json({ ok: false, message: "Cannot delete the initial admin" });
+        }
+
+        // Prevent self-deletion
+        if (id === req.user.id) {
+            return res.status(403).json({ ok: false, message: "Cannot delete your own account" });
+        }
+
+        const deletedAdmin = await Admin.findByIdAndDelete(id);
+
+        if (!deletedAdmin) {
+            return res.status(404).json({ ok: false, message: "Admin not found" });
+        }
+
+        res.json({
+            ok: true,
+            message: "Admin deleted successfully",
+            deletedAdmin: {
+                id: deletedAdmin._id,
+                username: deletedAdmin.username,
+                email: deletedAdmin.email,
+            },
+        });
+    } catch (error) {
+        logger.error("Error in deleteAdmin:", error);
+        res.status(500).json({
+            ok: false,
+            message: "Server error",
+            error: error.message || "Unknown error occurred",
+        });
+    }
+};
+// 9. Delete Vendor
+exports.deleteVendor = async (req, res) => {
+    try {
+        logger.info(`Deleting vendor. Request user: ${req.user.id}`);
+
+        const { id } = req.params;
+
+        const deletedVendor = await Vendor.findByIdAndDelete(id);
+
+        if (!deletedVendor) {
+            return res.status(404).json({ ok: false, message: "Vendor not found" });
+        }
+
+        res.json({
+            ok: true,
+            message: "Vendor deleted successfully",
+            deletedVendor: {
+                id: deletedVendor._id,
+                username: deletedVendor.username,
+                email: deletedVendor.email,
+                cin: deletedVendor.cin,
+            },
+        });
+    } catch (error) {
+        logger.error("Error in deleteVendor:", error);
+        res.status(500).json({
+            ok: false,
+            message: "Server error",
+            error: error.message || "Unknown error occurred",
+        });
+    }
+};
+// 10. Change Vendor Password
+exports.changeVendorPassword = async (req, res) => {
+    try {
+        console.log("Controller User:", req.user);
+        const { id } = req.params;
+        const { newPassword } = req.body;
+
+        // Find the vendor
+        const vendor = await Vendor.findById(id);
+        if (!vendor) {
+            return res.status(404).json({ ok: false, message: "Vendor not found" });
+        }
+
+        // Check if the request is coming from admin
+        const isAdmin = req.user.role === "admin";
+
+        if (!isAdmin) {
+            return res.status(403).json({ ok: false, message: "Not authorized to change this vendor's password" });
+        }
+
+        // Validate new password
+        if (newPassword.length < 8) {
+            return res.status(400).json({ ok: false, message: "New password must be at least 8 characters long" });
+        }
+
+        // Hash the new password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+        // Update the password
+        vendor.password = hashedPassword;
+        await vendor.save();
+
+        res.json({
+            ok: true,
+            message: "Vendor password changed successfully",
+        });
+    } catch (error) {
+        logger.error("Error in changeVendorPassword:", error);
         res.status(500).json({
             ok: false,
             message: "Server error",
