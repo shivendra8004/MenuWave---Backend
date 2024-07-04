@@ -304,3 +304,34 @@ exports.updateVendor = async (req, res) => {
         res.status(500).json({ ok: false, message: "Server error", error: error.message });
     }
 };
+// 7. Get all vendors
+exports.getAllVendors = async (req, res) => {
+    try {
+        logger.info(`Fetching all vendors. Request user: ${req.user.id}`);
+
+        const vendors = await Vendor.find().select("-__v").sort({ createdAt: -1 });
+
+        res.json({
+            ok: true,
+            vendors: vendors.map((vendor) => ({
+                id: vendor._id,
+                username: vendor.username,
+                email: vendor.email,
+                phone: vendor.phone,
+                address: vendor.address,
+                status: vendor.status,
+                cin: vendor.cin,
+                createdAt: vendor.createdAt,
+                updatedAt: vendor.updatedAt,
+            })),
+            totalVendors: vendors.length,
+        });
+    } catch (error) {
+        logger.error("Error in getAllVendors:", error);
+        res.status(500).json({
+            ok: false,
+            message: "Server error",
+            error: error.message || "Unknown error occurred",
+        });
+    }
+};
