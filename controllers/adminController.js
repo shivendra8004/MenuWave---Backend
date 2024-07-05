@@ -125,7 +125,7 @@ exports.adminLogin = async (req, res) => {
             });
         }
 
-        res.json({ token: generateToken(admin._id), username: admin.username, email: admin.email });
+        res.json({ ok: true, token: generateToken(admin._id), username: admin.username, email: admin.email });
     } catch (error) {
         logger.error("Error in admin login:", error);
         res.status(500).json({ ok: false, message: "Server error", error: error.message });
@@ -451,6 +451,88 @@ exports.changeVendorPassword = async (req, res) => {
         });
     } catch (error) {
         logger.error("Error in changeVendorPassword:", error);
+        res.status(500).json({
+            ok: false,
+            message: "Server error",
+            error: error.message || "Unknown error occurred",
+        });
+    }
+};
+
+// 11. Get all admins
+exports.getAllAdmins = async (req, res) => {
+    try {
+        logger.info(`Fetching all admins. Request user: ${req.user.id}`);
+
+        // Check if the requester is an admin
+        if (req.user.role !== "admin") {
+            return res.status(403).json({
+                ok: false,
+                message: "Access denied. Only admins can fetch admin list.",
+            });
+        }
+
+        const admins = await Admin.find().select("-password -__v").sort({ createdAt: -1 });
+
+        res.json({
+            ok: true,
+            admins: admins.map((admin) => ({
+                id: admin._id,
+                username: admin.username,
+                email: admin.email,
+                role: admin.role,
+                isInitialAdmin: admin.isInitialAdmin,
+                isPasswordChanged: admin.isPasswordChanged,
+                createdAt: admin.createdAt,
+                updatedAt: admin.updatedAt,
+            })),
+            totalAdmins: admins.length,
+        });
+    } catch (error) {
+        logger.error("Error in getAllAdmins:", error);
+        res.status(500).json({
+            ok: false,
+            message: "Server error",
+            error: error.message || "Unknown error occurred",
+        });
+    }
+};
+// 12.Return Dashboard Numbers
+exports.getDashboardStats = async (req, res) => {
+    try {
+        logger.info(`Fetching dashboard stats. Request user: ${req.user.id}`);
+
+        // Check if the requester is an admin
+        if (req.user.role !== "admin") {
+            return res.status(403).json({
+                ok: false,
+                message: "Access denied. Only admins can fetch dashboard stats.",
+            });
+        }
+
+        // Get count of admins
+        const adminCount = await Admin.countDocuments();
+
+        // Get count of vendors
+        const vendorCount = await Vendor.countDocuments();
+
+        // For categories, subcategories, and items, we'll return 0 as they're not implemented yet
+        const categoryCount = 0;
+        const subcategoryCount = 0;
+        const itemCount = 0;
+
+        res.json({
+            ok: true,
+            stats: {
+                totalAdmins: adminCount,
+                totalVendors: vendorCount,
+                totalCategories: categoryCount,
+                totalSubcategories: subcategoryCount,
+                totalItems: itemCount,
+            },
+        });
+    } catch (error) {
+        logger.error("Error in getDashboardStats:", error);
         res.status(500).json({
             ok: false,
             message: "Server error",
