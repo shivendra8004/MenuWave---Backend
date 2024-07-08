@@ -12,6 +12,7 @@ const vendorValidationSchema = z.object({
     address: z.string().min(5, { message: "Address must be at least 5 characters long" }),
     password: z.string().min(8, { message: "Password must be at least 8 characters long" }),
     status: z.enum(["active", "disabled"]).optional(),
+    isPasswordChanged: z.boolean().optional(),
 });
 
 module.exports = vendorValidationSchema;

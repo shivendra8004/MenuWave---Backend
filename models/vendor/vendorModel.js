@@ -14,6 +14,10 @@ const VendorSchema = new mongoose.Schema(
             default: "vendor",
             required: true,
         },
+        isPasswordChanged: {
+            type: Boolean,
+            default: false,
+        },
         email: {
             type: String,
             required: true,

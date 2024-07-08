@@ -118,7 +118,7 @@ exports.adminLogin = async (req, res) => {
         }
         if (!admin.isPasswordChanged) {
             return res.status(200).json({
-                ok: true,
+                ok: false,
                 message: "Please change your password",
                 token: generateToken(admin._id),
                 requirePasswordChange: true,
@@ -283,11 +283,6 @@ exports.updateVendor = async (req, res) => {
             message: "Vendor updated successfully",
             vendor: {
                 id: vendor._id,
-                username: vendor.username,
-                email: vendor.email,
-                phone: vendor.phone,
-                address: vendor.address,
-                status: vendor.status,
             },
         });
     } catch (error) {
@@ -322,9 +317,7 @@ exports.getAllVendors = async (req, res) => {
                 status: vendor.status,
                 cin: vendor.cin,
                 createdAt: vendor.createdAt,
-                updatedAt: vendor.updatedAt,
             })),
-            totalVendors: vendors.length,
         });
     } catch (error) {
         logger.error("Error in getAllVendors:", error);
@@ -365,11 +358,6 @@ exports.deleteAdmin = async (req, res) => {
         res.json({
             ok: true,
             message: "Admin deleted successfully",
-            deletedAdmin: {
-                id: deletedAdmin._id,
-                username: deletedAdmin.username,
-                email: deletedAdmin.email,
-            },
         });
     } catch (error) {
         logger.error("Error in deleteAdmin:", error);
@@ -486,7 +474,6 @@ exports.getAllAdmins = async (req, res) => {
                 createdAt: admin.createdAt,
                 updatedAt: admin.updatedAt,
             })),
-            totalAdmins: admins.length,
         });
     } catch (error) {
         logger.error("Error in getAllAdmins:", error);
