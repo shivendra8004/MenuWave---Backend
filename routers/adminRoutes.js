@@ -11,6 +11,9 @@ const {
     deleteVendor,
     getAllAdmins,
     getDashboardStats,
+    getAllCategories,
+    getAllSubcategories,
+    getAllItems,
 } = require("../controllers/adminController");
 const authRouter = require("./authRoutes");
 
@@ -23,6 +26,9 @@ adminRouter.put("/update/vendor/:id", adminOnlyAuth, updateVendor);
 adminRouter.get("/getAllVendors", adminOnlyAuth, getAllVendors);
 adminRouter.delete("/delete/admin/:id", adminOnlyAuth, deleteAdmin);
 adminRouter.delete("/delete/vendor/:id", adminOnlyAuth, deleteVendor);
+adminRouter.get("/getAllCategories", adminOnlyAuth, getAllCategories);
+adminRouter.get("/getAllSubCategories", adminOnlyAuth, getAllSubcategories);
+adminRouter.get("/getAllItems", adminOnlyAuth, getAllItems);
 adminRouter.use("/auth", authRouter);
 
 module.exports = adminRouter;

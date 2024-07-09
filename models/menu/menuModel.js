@@ -3,10 +3,10 @@ const { itemValidationSchema, subcategoryValidationSchema, categoryValidationSch
 
 const ItemSchema = new mongoose.Schema({
     title: { type: String, required: true },
-    description: { type: String },
+    description: { type: String, required: true },
     price: { type: Number, required: true },
     image: { type: String },
-    ingredients: [{ type: String }],
+    ingredients: [{ type: String, required: true }],
 });
 
 ItemSchema.pre("validate", function (next) {
@@ -50,7 +50,7 @@ CategorySchema.pre("validate", function (next) {
 const MenuSchema = new mongoose.Schema(
     {
         vendor: { type: mongoose.Schema.Types.ObjectId, ref: "Vendor", required: true },
-        type: { type: String, enum: ["Dine In", "Take Away", "Delivery"], required: true },
+        type: { type: String, enum: ["Dine In", "Take Away", "Delivery", "Room Service"], required: true },
         categories: [CategorySchema],
         uncategorizedItems: [{ type: mongoose.Schema.Types.ObjectId, ref: "Item" }],
     },

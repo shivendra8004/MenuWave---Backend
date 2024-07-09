@@ -6,6 +6,7 @@ const Vendor = require("../models/vendor/vendorModel");
 const adminValidationSchema = require("../models/admin/adminValidation");
 const logger = require("../logger/logger");
 const vendorValidationSchema = require("../models/vendor/vendorValidation");
+const { Menu, Item } = require("../models/menu/menuModel");
 const generateToken = (id) => {
     return jwt.sign({ id, role: "admin" }, process.env.JWT_SECRET, { expiresIn: "15m" });
 };
@@ -524,6 +525,107 @@ exports.getDashboardStats = async (req, res) => {
             ok: false,
             message: "Server error",
             error: error.message || "Unknown error occurred",
+        });
+    }
+};
+// 13. Get All Categories
+exports.getAllCategories = async (req, res) => {
+    try {
+        const menus = await Menu.find()
+            .select("categories")
+            .populate({
+                path: "categories.subcategories.items",
+                select: "-__v",
+            })
+            .select("-__v");
+
+        let categories = [];
+        menus.forEach((menu) => {
+            categories.push(...menu.categories);
+        });
+
+        res.json({ ok: true, categories: categories });
+    } catch (error) {
+        res.status(500).json({ ok: false, message: "Server error", error: error.message });
+    }
+};
+
+// 14. Get All Subcategories
+exports.getAllSubcategories = async (req, res) => {
+    try {
+        const menus = await Menu.find()
+            .select("categories.subcategories")
+            .populate({
+                path: "categories.subcategories.items",
+                select: "-__v",
+            })
+            .select("-__v");
+
+        let subcategories = [];
+        menus.forEach((menu) => {
+            menu.categories.forEach((category) => {
+                subcategories.push(...category.subcategories);
+            });
+        });
+
+        res.json({ ok: true, subcategories });
+    } catch (error) {
+        res.status(500).json({ ok: false, message: "Server error", error: error.message });
+    }
+};
+
+// 15. Get All Items
+exports.getAllItems = async (req, res) => {
+    try {
+        const menus = await Menu.find()
+            .populate({
+                path: "uncategorizedItems",
+                model: "Item",
+            })
+            .populate({
+                path: "categories.items",
+                model: "Item",
+            })
+            .populate({
+                path: "categories.subcategories.items",
+                model: "Item",
+            });
+
+        let allItems = [];
+
+        // Process uncategorized items
+        menus.forEach((menu) => {
+            menu.uncategorizedItems.forEach((item) => {
+                allItems.push(Item.findById(item._id).select("-__v").lean());
+            });
+
+            // Process items within categories and subcategories
+            menu.categories.forEach((category) => {
+                category.items.forEach((item) => {
+                    allItems.push(Item.findById(item._id).select("-__v").lean());
+                });
+
+                category.subcategories.forEach((subcategory) => {
+                    subcategory.items.forEach((item) => {
+                        allItems.push(Item.findById(item._id).select("-__v").lean());
+                    });
+                });
+            });
+        });
+
+        // Execute all promises to get item details
+        allItems = await Promise.all(allItems);
+
+        res.status(200).json({
+            ok: true,
+            items: allItems,
+        });
+    } catch (error) {
+        logger.error("Error fetching admin items:", error);
+        res.status(500).json({
+            ok: false,
+            message: "An error occurred while fetching items",
+            error: error.message,
         });
     }
 };

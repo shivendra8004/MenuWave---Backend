@@ -183,7 +183,7 @@ exports.addItem = async (req, res) => {
         // Fetch the updated menu
         const updatedMenu = await Menu.findById(menuId).lean();
 
-        res.json({ ok: true, menu: updatedMenu, item });
+        res.json({ ok: true, item });
     } catch (error) {
         if (error instanceof ZodError) {
             console.log("Validation error:", JSON.stringify(error.errors, null, 2));
@@ -316,5 +316,380 @@ exports.changeVendorPasswordByVendor = async (req, res) => {
             });
         }
         res.status(500).json({ ok: false, message: "Server error", error: error.message });
+    }
+};
+exports.getDashboardCounts = async (req, res) => {
+    try {
+        const menuCount = await Menu.countDocuments({ vendor: req.vendor._id });
+
+        const categoryCounts = await Menu.aggregate([
+            { $match: { vendor: req.vendor._id } },
+            { $unwind: "$categories" },
+            {
+                $group: {
+                    _id: null,
+                    categoryCount: { $addToSet: "$categories._id" },
+                    subcategoryCount: { $addToSet: "$categories.subcategories._id" },
+                },
+            },
+            {
+                $project: {
+                    _id: 0,
+                    categoryCount: { $size: "$categoryCount" },
+                    subcategoryCount: {
+                        $size: {
+                            $reduce: {
+                                input: "$subcategoryCount",
+                                initialValue: [],
+                                in: { $concatArrays: ["$$value", "$$this"] },
+                            },
+                        },
+                    },
+                },
+            },
+        ]);
+        const itemCount = await Item.countDocuments();
+
+        res.json({
+            ok: true,
+            counts: {
+                menus: menuCount,
+                categories: categoryCounts[0]?.categoryCount || 0,
+                subcategories: categoryCounts[0]?.subcategoryCount || 0,
+                items: itemCount,
+            },
+        });
+    } catch (error) {
+        console.error("Error fetching dashboard counts:", error);
+        res.status(500).json({ ok: false, message: "Server error", error: error.message });
+    }
+};
+exports.getVendorMenus = async (req, res) => {
+    try {
+        const vendorId = req.vendor._id;
+
+        const menus = await Menu.find({ vendor: vendorId }).select("_id type").lean();
+
+        res.status(200).json({
+            ok: true,
+            menus: menus,
+        });
+    } catch (error) {
+        console.error("Error fetching vendor menus:", error);
+        res.status(500).json({
+            ok: false,
+            message: "An error occurred while fetching menus",
+            error: error.message,
+        });
+    }
+};
+exports.getVendorCategories = async (req, res) => {
+    try {
+        const vendorId = req.vendor._id;
+
+        const categories = await Menu.aggregate([
+            { $match: { vendor: vendorId } },
+            { $unwind: "$categories" },
+            {
+                $group: {
+                    _id: "$categories._id",
+                    name: { $first: "$categories.name" },
+                    menuId: { $first: "$_id" },
+                },
+            },
+            {
+                $project: {
+                    _id: 1,
+                    name: 1,
+                    menuId: 1,
+                },
+            },
+        ]);
+
+        res.status(200).json({
+            ok: true,
+            categories: categories,
+        });
+    } catch (error) {
+        console.error("Error fetching vendor categories:", error);
+        res.status(500).json({
+            ok: false,
+            message: "An error occurred while fetching categories",
+            error: error.message,
+        });
+    }
+};
+exports.getVendorSubcategories = async (req, res) => {
+    try {
+        const vendorId = req.vendor._id;
+
+        const subcategories = await Menu.aggregate([
+            { $match: { vendor: vendorId } },
+            { $unwind: "$categories" },
+            { $unwind: "$categories.subcategories" },
+            {
+                $group: {
+                    _id: "$categories.subcategories._id",
+                    name: { $first: "$categories.subcategories.name" },
+                    categoryId: { $first: "$categories._id" },
+                    menuId: { $first: "$_id" },
+                },
+            },
+            {
+                $project: {
+                    _id: 1,
+                    name: 1,
+                    categoryId: 1,
+                    menuId: 1,
+                },
+            },
+        ]);
+
+        res.status(200).json({
+            ok: true,
+            subcategories: subcategories,
+        });
+    } catch (error) {
+        console.error("Error fetching vendor subcategories:", error);
+        res.status(500).json({
+            ok: false,
+            message: "An error occurred while fetching subcategories",
+            error: error.message,
+        });
+    }
+};
+exports.getVendorItems = async (req, res) => {
+    try {
+        const vendorId = req.vendor._id;
+
+        // Find all menus for this vendor
+        const menus = await Menu.find({ vendor: vendorId })
+            .populate({
+                path: "uncategorizedItems",
+                model: "Item",
+            })
+            .populate({
+                path: "categories.items",
+                model: "Item",
+            })
+            .populate({
+                path: "categories.subcategories.items",
+                model: "Item",
+            });
+
+        let allItems = [];
+
+        menus.forEach((menu) => {
+            // Add uncategorized items
+            allItems = allItems.concat(
+                menu.uncategorizedItems.map((item) => ({
+                    ...item.toObject(),
+                    menuId: menu._id,
+                    menuType: menu.type,
+                    category: "Uncategorized",
+                    subcategory: null,
+                }))
+            );
+
+            // Add items from categories and subcategories
+            menu.categories.forEach((category) => {
+                allItems = allItems.concat(
+                    category.items.map((item) => ({
+                        ...item.toObject(),
+                        menuId: menu._id,
+                        menuType: menu.type,
+                        category: category.name,
+                        categoryId: category._id,
+                        subcategory: null,
+                    }))
+                );
+
+                category.subcategories.forEach((subcategory) => {
+                    allItems = allItems.concat(
+                        subcategory.items.map((item) => ({
+                            ...item.toObject(),
+                            menuId: menu._id,
+                            menuType: menu.type,
+                            categoryId: category._id,
+                            category: category.name,
+                            subcategoryId: subcategory._id,
+                            subcategory: subcategory.name,
+                        }))
+                    );
+                });
+            });
+        });
+
+        res.status(200).json({
+            ok: true,
+            items: allItems,
+        });
+    } catch (error) {
+        logger.error("Error fetching vendor items:", error);
+        res.status(500).json({
+            ok: false,
+            message: "An error occurred while fetching items",
+            error: error.message,
+        });
+    }
+};
+// Delete a category
+exports.deleteCategory = async (req, res) => {
+    try {
+        const { menuId, categoryId } = req.params;
+
+        const menu = await Menu.findOne({ _id: menuId, vendor: req.vendor._id });
+        if (!menu) {
+            return res.status(404).json({ ok: false, message: "Menu not found" });
+        }
+
+        const categoryIndex = menu.categories.findIndex((cat) => cat._id.toString() === categoryId);
+        if (categoryIndex === -1) {
+            return res.status(404).json({ ok: false, message: "Category not found" });
+        }
+
+        menu.categories.splice(categoryIndex, 1);
+        await menu.save();
+
+        res.json({ ok: true, message: "Category deleted successfully" });
+    } catch (error) {
+        logger.error("Error deleting category:", error);
+        res.status(500).json({ ok: false, message: "Server error", error: error.message });
+    }
+};
+
+// Delete a subcategory
+exports.deleteSubcategory = async (req, res) => {
+    try {
+        const { menuId, categoryId, subcategoryId } = req.params;
+
+        const menu = await Menu.findOne({ _id: menuId, vendor: req.vendor._id });
+        if (!menu) {
+            return res.status(404).json({ ok: false, message: "Menu not found" });
+        }
+
+        const category = menu.categories.id(categoryId);
+        if (!category) {
+            return res.status(404).json({ ok: false, message: "Category not found" });
+        }
+
+        const subcategoryIndex = category.subcategories.findIndex((subcat) => subcat._id.toString() === subcategoryId);
+        if (subcategoryIndex === -1) {
+            return res.status(404).json({ ok: false, message: "Subcategory not found" });
+        }
+
+        category.subcategories.splice(subcategoryIndex, 1);
+        await menu.save();
+
+        res.json({ ok: true, message: "Subcategory deleted successfully" });
+    } catch (error) {
+        logger.error("Error deleting subcategory:", error);
+        res.status(500).json({ ok: false, message: "Server error", error: error.message });
+    }
+};
+
+// Delete an item
+
+exports.getAllMenus = async (req, res) => {
+    const { vendorId } = req.params;
+    try {
+        const menus = await Menu.find({ vendor: vendorId });
+        res.json({ ok: true, menus: menus });
+    } catch (error) {
+        logger.error("Error fetching vendor menus:", error);
+        res.status(500).json({ ok: false, message: "Server error", error: error.message });
+    }
+};
+exports.deleteVendorItem = async (req, res) => {
+    try {
+        const { menuId, categoryId, subcategoryId, itemId } = req.params;
+        logger.info("menuId:", menuId, "categoryId:", categoryId, "subcategoryId:", subcategoryId, "itemId:", itemId);
+        const vendorId = req.vendor._id;
+        const menu = await Menu.findOne({ _id: menuId, vendor: vendorId });
+
+        if (!menu) {
+            return res.status(404).json({ ok: false, message: "Menu not found" });
+        }
+
+        let itemFound = false;
+
+        // Check uncategorized items first
+        if (categoryId) {
+            // If categoryId is provided, look in the specific category
+            const category = menu.categories.find((cat) => cat._id.toString() === categoryId);
+            if (!category) {
+                const uncategorizedIndex = menu.uncategorizedItems.findIndex((id) => id.toString() === itemId);
+                if (uncategorizedIndex !== -1) {
+                    menu.uncategorizedItems.splice(uncategorizedIndex, 1);
+                    itemFound = true;
+                }
+            }
+            if (subcategoryId) {
+                // If subcategoryId is provided, look in the specific subcategory
+                const subcategory = category.subcategories.find((subcat) => subcat._id.toString() === subcategoryId);
+                if (!subcategory) {
+                    const categoryItemIndex = category.items.findIndex((id) => id.toString() === itemId);
+                    if (categoryItemIndex !== -1) {
+                        category.items.splice(categoryItemIndex, 1);
+                        itemFound = true;
+                    }
+                }
+                const subcategoryItemIndex = subcategory.items.findIndex((id) => id.toString() === itemId);
+                if (subcategoryItemIndex !== -1) {
+                    subcategory.items.splice(subcategoryItemIndex, 1);
+                    itemFound = true;
+                }
+            }
+        } else {
+            // If no categoryId is provided, search through all categories and subcategories
+            for (let category of menu.categories) {
+                const categoryItemIndex = category.items.findIndex((id) => id.toString() === itemId);
+                if (categoryItemIndex !== -1) {
+                    category.items.splice(categoryItemIndex, 1);
+                    itemFound = true;
+                    break;
+                }
+                for (let subcategory of category.subcategories) {
+                    const subcategoryItemIndex = subcategory.items.findIndex((id) => id.toString() === itemId);
+                    if (subcategoryItemIndex !== -1) {
+                        subcategory.items.splice(subcategoryItemIndex, 1);
+                        itemFound = true;
+                        break;
+                    }
+                }
+                if (itemFound) break;
+            }
+        }
+
+        if (!itemFound) {
+            return res.status(404).json({ ok: false, message: "Item not found in the specified location" });
+        }
+
+        // Save the menu without triggering validation
+        await menu.save({ validateBeforeSave: false });
+
+        // Delete the item
+        await Item.findByIdAndDelete(itemId);
+
+        res.json({ ok: true, message: "Item deleted successfully" });
+    } catch (error) {
+        console.error("Error deleting item:", error);
+        res.status(500).json({ ok: false, message: "Server error", error: error.message });
+    }
+};
+exports.fetchItemByCustomer = async (req, res) => {
+    try {
+        const { itemId } = req.params;
+
+        const item = await Item.findById(itemId);
+
+        if (!item) {
+            return res.status(404).json({ ok: false, message: "Item not found" });
+        }
+
+        res.status(200).json({ ok: true, item });
+    } catch (error) {
+        console.error("Error fetching item:", error);
+        res.status(500).json({ ok: false, message: "Internal server error" });
     }
 };

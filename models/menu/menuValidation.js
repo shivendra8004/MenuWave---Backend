@@ -3,10 +3,10 @@ const { z } = require("zod");
 
 const itemValidationSchema = z.object({
     title: z.string().min(1, { message: "Title is required" }).max(100, { message: "Title must not exceed 100 characters" }),
-    description: z.string().max(500, { message: "Description must not exceed 500 characters" }).optional(),
+    description: z.string().max(500, { message: "Description must not exceed 500 characters" }),
     price: z.number().positive({ message: "Price must be a positive number" }),
     image: z.string().url({ message: "Invalid image URL" }).optional(),
-    ingredients: z.array(z.string()).optional(),
+    ingredients: z.array(z.string()),
 });
 
 const subcategoryValidationSchema = z.object({
@@ -24,7 +24,7 @@ const objectIdValidation = z.string().refine((val) => mongoose.Types.ObjectId.is
 });
 const menuValidationSchema = z.object({
     vendor: objectIdValidation,
-    type: z.enum(["Dine In", "Take Away", "Delivery"]),
+    type: z.enum(["Dine In", "Take Away", "Delivery", "Room Service"]),
     categories: z
         .array(
             z.object({
