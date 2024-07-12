@@ -11,6 +11,7 @@ const {
     getAllMenus,
     fetchItemByCustomer,
 } = require("../controllers/vendorController");
+const { vendorDetails } = require("../controllers/userController");
 const vendorRouter = express.Router();
 vendorRouter.get("/getDashboardData", vendorOnlyAuth, getDashboardCounts);
 vendorRouter.get("/getVendorMenus", vendorOnlyAuth, getVendorMenus);
@@ -21,5 +22,6 @@ vendorRouter.use("/auth", authRouter);
 vendorRouter.use("/menu", vendorOnlyAuth, menuRouter);
 vendorRouter.get("/:vendorId/all", getAllMenus);
 vendorRouter.get("/item/:itemId", fetchItemByCustomer);
+vendorRouter.get("/:vendorId", vendorDetails);
 
 module.exports = vendorRouter;
