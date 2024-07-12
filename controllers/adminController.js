@@ -195,12 +195,12 @@ exports.createVendor = async (req, res) => {
     try {
         logger.log("Creating new vendor. Request user:", req.user);
 
-        const { username, email, phone, cin, address, password } = req.body;
+        const { username, email, logo, phone, cin, address, password } = req.body;
 
         // Check if vendor already exists
         const existingVendor = await Vendor.findOne({ $or: [{ email }, { cin }] });
         if (existingVendor) {
-            return res.status(400).json({ ok: false, message: "Vendor with this username and email already exists" });
+            return res.status(400).json({ ok: false, message: "Vendor with this and email and cin number already exists" });
         }
 
         const hashedPassword = await bcrypt.hash(password, 12);
@@ -211,6 +211,7 @@ exports.createVendor = async (req, res) => {
             cin,
             phone,
             address,
+            logo,
             password: hashedPassword,
         });
 
@@ -219,16 +220,17 @@ exports.createVendor = async (req, res) => {
         res.status(201).json({ ok: true, message: "New vendor created successfully" });
     } catch (error) {
         if (error instanceof ZodError) {
+            console.log("Zod Error:", error);
             return res.status(400).json({
                 ok: false,
-                message: "Validation error",
+                message: "Validation error 1",
                 errors: error.errors.map((err) => ({
                     field: err.path.join("."),
                     message: err.message,
                 })),
             });
         }
-        if (error.name === "ValidationError") {
+        if (error.name === "ValidationError 2") {
             return res.status(400).json({
                 ok: false,
                 message: "Validation error",

@@ -56,6 +56,7 @@ exports.vendorLogin = async (req, res) => {
                 phone: vendor.phone,
                 address: vendor.address,
                 status: vendor.status,
+                logo: vendor.logo,
                 creationDate: vendor.createdAt,
             },
         });

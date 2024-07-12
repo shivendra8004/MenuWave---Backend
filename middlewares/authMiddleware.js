@@ -22,7 +22,6 @@ exports.protectAuth = async (req, res, next) => {
 
             next();
         } catch (error) {
-            logger.error("Error in auth middleware:", error);
             res.status(401).json({ ok: false, message: "Not authorized, token failed" });
         }
     } else if (!token) {
@@ -37,7 +36,7 @@ exports.adminOnlyAuth = async (req, res, next) => {
             token = req.headers.authorization.split(" ")[1];
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
             req.user = await Admin.findById(decoded.id).select("-password");
-            console.log("Middleware User:", req.user.role);
+
             if (!req.user || req.user.role !== "admin") {
                 return res.status(401).json({ ok: false, message: "Not authorized, admin only" });
             }

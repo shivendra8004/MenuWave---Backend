@@ -4,6 +4,7 @@ const vendorValidationSchema = z.object({
     username: z.string().min(2, { message: "Username must be at least 2 characters long" }).max(100, { message: "Username must not exceed 100 characters" }),
     role: z.string().default("vendor"),
     email: z.string().email({ message: "Invalid email address" }),
+    logo: z.string().url({ message: "Invalid URL" }),
     cin: z
         .string()
         .length(21, { message: "CIN must be exactly 21 characters long" })

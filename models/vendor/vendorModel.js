@@ -9,6 +9,10 @@ const VendorSchema = new mongoose.Schema(
             minlength: 2,
             maxlength: 100,
         },
+        logo: {
+            type: String,
+            required: true,
+        },
         role: {
             type: String,
             default: "vendor",
