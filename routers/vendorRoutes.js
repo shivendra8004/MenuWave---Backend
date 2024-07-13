@@ -18,10 +18,10 @@ vendorRouter.get("/getVendorMenus", vendorOnlyAuth, getVendorMenus);
 vendorRouter.get("/getVendorCategories", vendorOnlyAuth, getVendorCategories);
 vendorRouter.get("/getVendorSubCategories", vendorOnlyAuth, getVendorSubcategories);
 vendorRouter.get("/getVendorItems", vendorOnlyAuth, getVendorItems);
-vendorRouter.use("/auth", authRouter);
-vendorRouter.use("/menu", vendorOnlyAuth, menuRouter);
 vendorRouter.get("/:vendorId/all", getAllMenus);
 vendorRouter.get("/item/:itemId", fetchItemByCustomer);
 vendorRouter.get("/:vendorId", vendorDetails);
+vendorRouter.use("/auth", authRouter);
+vendorRouter.use("/menu", vendorOnlyAuth, menuRouter);
 
 module.exports = vendorRouter;

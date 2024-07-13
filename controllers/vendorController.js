@@ -604,80 +604,48 @@ exports.getAllMenus = async (req, res) => {
 exports.deleteVendorItem = async (req, res) => {
     try {
         const { menuId, categoryId, subcategoryId, itemId } = req.params;
-        logger.info("menuId:", menuId, "categoryId:", categoryId, "subcategoryId:", subcategoryId, "itemId:", itemId);
         const vendorId = req.vendor._id;
         const menu = await Menu.findOne({ _id: menuId, vendor: vendorId });
 
-        if (!menu) {
-            return res.status(404).json({ ok: false, message: "Menu not found" });
-        }
-
-        let itemFound = false;
-
-        // Check uncategorized items first
-        if (categoryId) {
-            // If categoryId is provided, look in the specific category
+        if (menu) {
             const category = menu.categories.find((cat) => cat._id.toString() === categoryId);
-            if (!category) {
-                const uncategorizedIndex = menu.uncategorizedItems.findIndex((id) => id.toString() === itemId);
-                if (uncategorizedIndex !== -1) {
-                    menu.uncategorizedItems.splice(uncategorizedIndex, 1);
-                    itemFound = true;
-                }
-            }
-            if (subcategoryId) {
-                // If subcategoryId is provided, look in the specific subcategory
+            if (category) {
                 const subcategory = category.subcategories.find((subcat) => subcat._id.toString() === subcategoryId);
-                if (!subcategory) {
-                    const categoryItemIndex = category.items.findIndex((id) => id.toString() === itemId);
-                    if (categoryItemIndex !== -1) {
-                        category.items.splice(categoryItemIndex, 1);
-                        itemFound = true;
-                    }
-                }
-                const subcategoryItemIndex = subcategory.items.findIndex((id) => id.toString() === itemId);
-                if (subcategoryItemIndex !== -1) {
-                    subcategory.items.splice(subcategoryItemIndex, 1);
-                    itemFound = true;
-                }
-            }
-        } else {
-            // If no categoryId is provided, search through all categories and subcategories
-            for (let category of menu.categories) {
-                const categoryItemIndex = category.items.findIndex((id) => id.toString() === itemId);
-                if (categoryItemIndex !== -1) {
-                    category.items.splice(categoryItemIndex, 1);
-                    itemFound = true;
-                    break;
-                }
-                for (let subcategory of category.subcategories) {
+                if (subcategory) {
                     const subcategoryItemIndex = subcategory.items.findIndex((id) => id.toString() === itemId);
                     if (subcategoryItemIndex !== -1) {
                         subcategory.items.splice(subcategoryItemIndex, 1);
-                        itemFound = true;
-                        break;
+                        await menu.save({ validateBeforeSave: false });
+                        await Item.findByIdAndDelete(itemId);
+                        res.json({ ok: true, message: "Item deleted successfully" });
+                    }
+                } else {
+                    const subcategoryItemIndex = subcategory.items.findIndex((id) => id.toString() === itemId);
+                    if (subcategoryItemIndex !== -1) {
+                        subcategory.items.splice(subcategoryItemIndex, 1);
+                        await menu.save({ validateBeforeSave: false });
+                        await Item.findByIdAndDelete(itemId);
+                        res.json({ ok: true, message: "Item deleted successfully" });
                     }
                 }
-                if (itemFound) break;
+            } else {
+                const uncategorizedIndex = menu.uncategorizedItems.findIndex((id) => id.toString() === itemId);
+                if (uncategorizedIndex !== -1) {
+                    menu.uncategorizedItems.splice(uncategorizedIndex, 1);
+                    await menu.save({ validateBeforeSave: false });
+                    await Item.findByIdAndDelete(itemId);
+                    res.json({ ok: true, message: "Item deleted successfully" });
+                }
             }
+        } else {
+            return res.status(404).json({ ok: false, message: "Menu not found" });
         }
-
-        if (!itemFound) {
-            return res.status(404).json({ ok: false, message: "Item not found in the specified location" });
-        }
-
-        // Save the menu without triggering validation
-        await menu.save({ validateBeforeSave: false });
-
-        // Delete the item
-        await Item.findByIdAndDelete(itemId);
-
-        res.json({ ok: true, message: "Item deleted successfully" });
     } catch (error) {
         console.error("Error deleting item:", error);
         res.status(500).json({ ok: false, message: "Server error", error: error.message });
     }
 };
+
 exports.fetchItemByCustomer = async (req, res) => {
     try {
         const { itemId } = req.params;
@@ -690,7 +658,45 @@ exports.fetchItemByCustomer = async (req, res) => {
 
         res.status(200).json({ ok: true, item });
     } catch (error) {
-        console.error("Error fetching item:", error);
+        console.error("Error fetching item:", efrror);
         res.status(500).json({ ok: false, message: "Internal server error" });
+    }
+};
+exports.updateItem = async (req, res) => {
+    try {
+        const { itemId } = req.params;
+        const { title, description, price, image, ingredients } = req.body;
+        const vendorId = req.vendor._id;
+
+        try {
+            await itemValidationSchema.parseAsync({ title, description, price, image, ingredients });
+        } catch (zodError) {
+            return res.status(400).json({
+                ok: false,
+                message: "Validation Error, Please check weather you have provided all required value or not, For Eg. Image",
+                errors: zodError.errors,
+            });
+        }
+
+        const item = await Item.findById(itemId);
+        if (!item) {
+            return res.status(404).json({ ok: false, message: "Item not found" });
+        }
+
+        const menuWithItem = await Menu.findOne({
+            vendor: vendorId,
+            $or: [{ "categories.items": itemId }, { "categories.subcategories.items": itemId }, { uncategorizedItems: itemId }],
+        });
+
+        if (!menuWithItem) {
+            return res.status(403).json({ ok: false, message: "You don't have permission to update this item" });
+        }
+
+        await Item.findByIdAndUpdate(itemId, { title, description, price, image, ingredients }, { new: true, runValidators: true });
+
+        res.json({ ok: true, message: "Item updated successfully" });
+    } catch (error) {
+        console.error("Error updating item:", error);
+        res.status(500).json({ ok: false, message: "Server error", error: error.message });
     }
 };

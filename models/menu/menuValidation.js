@@ -5,7 +5,7 @@ const itemValidationSchema = z.object({
     title: z.string().min(1, { message: "Title is required" }).max(100, { message: "Title must not exceed 100 characters" }),
     description: z.string().max(500, { message: "Description must not exceed 500 characters" }),
     price: z.number().positive({ message: "Price must be a positive number" }),
-    image: z.string().url({ message: "Invalid image URL" }).optional(),
+    image: z.string().url({ message: "Invalid image URL" }),
     ingredients: z.array(z.string()),
 });
 
