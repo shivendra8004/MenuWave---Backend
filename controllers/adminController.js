@@ -8,7 +8,7 @@ const logger = require("../logger/logger");
 const vendorValidationSchema = require("../models/vendor/vendorValidation");
 const { Menu, Item } = require("../models/menu/menuModel");
 const generateToken = (id) => {
-    return jwt.sign({ id, role: "admin" }, process.env.JWT_SECRET, { expiresIn: "15m" });
+    return jwt.sign({ id, role: "admin" }, process.env.JWT_SECRET, { expiresIn: "1h" });
 };
 
 // 1. Create initial admin

@@ -9,7 +9,7 @@ const { Menu, Item } = require("../models/menu/menuModel");
 const { itemValidationSchema, categoryValidationSchema, subcategoryValidationSchema, menuValidationSchema } = require("../models/menu/menuValidation");
 
 const generateToken = (id) => {
-    return jwt.sign({ id, role: "vendor" }, process.env.JWT_SECRET, { expiresIn: "15m" });
+    return jwt.sign({ id, role: "vendor" }, process.env.JWT_SECRET, { expiresIn: "1h" });
 };
 
 // Vendor Login
