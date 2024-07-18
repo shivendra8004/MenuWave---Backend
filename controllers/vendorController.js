@@ -7,9 +7,14 @@ const vendorValidationSchema = require("../models/vendor/vendorValidation");
 const logger = require("../logger/logger");
 const { Menu, Item } = require("../models/menu/menuModel");
 const { itemValidationSchema, categoryValidationSchema, subcategoryValidationSchema, menuValidationSchema } = require("../models/menu/menuValidation");
-
+const CacheService = require("../cacheServer");
+const cache = new CacheService(60 * 60);
 const generateToken = (id) => {
     return jwt.sign({ id, role: "vendor" }, process.env.JWT_SECRET, { expiresIn: "1h" });
+};
+exports.invalidateVendorCache = (username, email) => {
+    const cacheKey = `vendor:${username}:${email}`;
+    cache.del(cacheKey);
 };
 
 // Vendor Login
@@ -30,20 +35,39 @@ exports.vendorLogin = async (req, res) => {
             });
         }
 
-        const vendor = await Vendor.findOne({ username, email });
+        const cacheKey = `vendor:${username}:${email}`;
+
+        let vendor = cache.get(cacheKey);
+
+        if (!vendor) {
+            vendor = await Vendor.findOne({ username, email }).select("+password");
+            if (!vendor.isPasswordChanged) {
+                const vendorCache = { ...vendor.toObject(), password: undefined, isPasswordChanged: true };
+                cache.set(cacheKey, vendorCache);
+                return res.status(200).json({
+                    ok: false,
+                    message: "Please change your password",
+                    token: generateToken(vendor._id),
+                    requirePasswordChange: true,
+                });
+            }
+            if (vendor) {
+                const vendorCache = { ...vendor.toObject(), password: undefined };
+                cache.set(cacheKey, vendorCache);
+            }
+        }
+
         if (!vendor) {
             return res.status(401).json({ ok: false, message: "Invalid Username or Email" });
         }
+
+        if (!vendor.password) {
+            const vendorFromDB = await Vendor.findById(vendor._id).select("+password");
+            vendor.password = vendorFromDB.password;
+        }
+
         if (!(await bcrypt.compare(password, vendor.password))) {
             return res.status(401).json({ ok: false, message: "Invalid password" });
-        }
-        if (!vendor.isPasswordChanged) {
-            return res.status(200).json({
-                ok: false,
-                message: "Please change your password",
-                token: generateToken(vendor._id),
-                requirePasswordChange: true,
-            });
         }
 
         res.json({
@@ -52,7 +76,8 @@ exports.vendorLogin = async (req, res) => {
             vendor: {
                 username: vendor.username,
                 email: vendor.email,
-                cin: vendor.cin,
+                gstnumber: vendor?.gstnumber,
+                theme: vendor.theme,
                 phone: vendor.phone,
                 address: vendor.address,
                 status: vendor.status,
@@ -65,6 +90,7 @@ exports.vendorLogin = async (req, res) => {
         res.status(500).json({ ok: false, message: "Server error", error: error.message });
     }
 };
+
 exports.createMenu = async (req, res) => {
     try {
         const { type } = req.body;

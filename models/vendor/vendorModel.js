@@ -27,11 +27,9 @@ const VendorSchema = new mongoose.Schema(
             required: true,
             unique: true,
         },
-        cin: {
+        gstNumber: {
             type: String,
-            required: true,
-            unique: true,
-            length: 21,
+            required: false,
         },
         phone: {
             type: String,
@@ -42,6 +40,10 @@ const VendorSchema = new mongoose.Schema(
             required: true,
         },
         password: {
+            type: String,
+            required: true,
+        },
+        theme: {
             type: String,
             required: true,
         },

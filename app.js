@@ -10,12 +10,16 @@ const connectDatabase = require("./database/db");
 const authRouter = require("./routers/authRoutes");
 const adminRouter = require("./routers/adminRoutes");
 const vendorRouter = require("./routers/vendorRoutes");
+const CacheService = require("./cacheServer");
 const app = express();
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 600,
 });
 dotenv.config();
+// start cache service
+const cache = new CacheService(3600);
+global.cache = cache;
 
 // Middleware
 app.use(limiter);

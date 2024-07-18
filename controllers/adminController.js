@@ -7,6 +7,8 @@ const adminValidationSchema = require("../models/admin/adminValidation");
 const logger = require("../logger/logger");
 const vendorValidationSchema = require("../models/vendor/vendorValidation");
 const { Menu, Item } = require("../models/menu/menuModel");
+const CacheService = require("../cacheServer");
+const cache = new CacheService(60 * 60);
 const generateToken = (id) => {
     return jwt.sign({ id, role: "admin" }, process.env.JWT_SECRET, { expiresIn: "1h" });
 };
@@ -194,43 +196,65 @@ exports.changePassword = async (req, res) => {
 exports.createVendor = async (req, res) => {
     try {
         logger.log("Creating new vendor. Request user:", req.user);
+        const { username, email, logo, phone, gstNumber, address, theme, password } = req.body;
 
-        const { username, email, logo, phone, cin, address, password } = req.body;
+        const emailCacheKey = `vendor:email:${email}`;
+        const gstCacheKey = gstNumber ? `vendor:gst:${gstNumber}` : null;
 
-        // Check if vendor already exists
-        const existingVendor = await Vendor.findOne({ $or: [{ email }, { cin }] });
-        if (existingVendor) {
-            return res.status(400).json({ ok: false, message: "Vendor with this and email and cin number already exists" });
+        let existingVendorByEmail = cache.get(emailCacheKey);
+        let existingVendorByGST = gstNumber ? cache.get(gstCacheKey) : null;
+
+        if (existingVendorByEmail === undefined) {
+            existingVendorByEmail = await Vendor.findOne({ email });
+            cache.set(emailCacheKey, existingVendorByEmail || null);
+        }
+
+        if (gstNumber && existingVendorByGST === undefined) {
+            existingVendorByGST = await Vendor.findOne({ gstNumber });
+            cache.set(gstCacheKey, existingVendorByGST || null);
+        }
+
+        if (existingVendorByEmail || existingVendorByGST) {
+            return res.status(400).json({
+                ok: false,
+                message:
+                    existingVendorByEmail && existingVendorByGST
+                        ? "Vendor with this email and GST number already exists"
+                        : existingVendorByEmail
+                        ? "Vendor with this email already exists"
+                        : "Vendor with this GST number already exists",
+            });
         }
 
         const hashedPassword = await bcrypt.hash(password, 12);
-
         const vendor = new Vendor({
             username,
             email,
-            cin,
+            theme,
+            gstNumber,
             phone,
             address,
             logo,
             password: hashedPassword,
         });
-
         await vendor.save();
+
+        cache.del(emailCacheKey);
+        if (gstCacheKey) cache.del(gstCacheKey);
 
         res.status(201).json({ ok: true, message: "New vendor created successfully" });
     } catch (error) {
         if (error instanceof ZodError) {
-            console.log("Zod Error:", error);
             return res.status(400).json({
                 ok: false,
-                message: "Validation error 1",
+                message: "Validation error",
                 errors: error.errors.map((err) => ({
                     field: err.path.join("."),
                     message: err.message,
                 })),
             });
         }
-        if (error.name === "ValidationError 2") {
+        if (error.name === "ValidationError") {
             return res.status(400).json({
                 ok: false,
                 message: "Validation error",
@@ -243,6 +267,7 @@ exports.createVendor = async (req, res) => {
         res.status(500).json({ ok: false, message: "Server error", error: error.message });
     }
 };
+
 // 6. Update vendor
 exports.updateVendor = async (req, res) => {
     try {
