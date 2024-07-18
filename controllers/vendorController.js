@@ -331,6 +331,7 @@ exports.getDashboardCounts = async (req, res) => {
                     _id: null,
                     categoryCount: { $addToSet: "$categories._id" },
                     subcategoryCount: { $addToSet: "$categories.subcategories._id" },
+                    itemCount: { $addToSet: "$categories.subcategories.items._id" },
                 },
             },
             {
@@ -346,10 +347,18 @@ exports.getDashboardCounts = async (req, res) => {
                             },
                         },
                     },
+                    itemCount: {
+                        $size: {
+                            $reduce: {
+                                input: "$itemCount",
+                                initialValue: [],
+                                in: { $concatArrays: ["$$value", "$$this"] },
+                            },
+                        },
+                    },
                 },
             },
         ]);
-        const itemCount = await Item.countDocuments();
 
         res.json({
             ok: true,
@@ -357,7 +366,7 @@ exports.getDashboardCounts = async (req, res) => {
                 menus: menuCount,
                 categories: categoryCounts[0]?.categoryCount || 0,
                 subcategories: categoryCounts[0]?.subcategoryCount || 0,
-                items: itemCount,
+                items: categoryCounts[0]?.itemCount || 0,
             },
         });
     } catch (error) {
@@ -396,6 +405,7 @@ exports.getVendorCategories = async (req, res) => {
                     _id: "$categories._id",
                     name: { $first: "$categories.name" },
                     menuId: { $first: "$_id" },
+                    menuName: { $first: "$type" },
                 },
             },
             {
@@ -403,6 +413,7 @@ exports.getVendorCategories = async (req, res) => {
                     _id: 1,
                     name: 1,
                     menuId: 1,
+                    menuName: 1,
                 },
             },
         ]);
@@ -433,7 +444,9 @@ exports.getVendorSubcategories = async (req, res) => {
                     _id: "$categories.subcategories._id",
                     name: { $first: "$categories.subcategories.name" },
                     categoryId: { $first: "$categories._id" },
+                    categoryName: { $first: "$categories.name" },
                     menuId: { $first: "$_id" },
+                    menuName: { $first: "$type" },
                 },
             },
             {
@@ -441,7 +454,9 @@ exports.getVendorSubcategories = async (req, res) => {
                     _id: 1,
                     name: 1,
                     categoryId: 1,
+                    categoryName: 1,
                     menuId: 1,
+                    menuName: 1,
                 },
             },
         ]);
