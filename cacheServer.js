@@ -9,7 +9,7 @@ class CacheService {
         });
 
         this.MAX_CACHE_SIZE = 100; // Adjust based on your needs
-        this.CLEAN_INTERVAL = 60000; // Clean every minute
+        this.CLEAN_INTERVAL = 60000 * 5; // Clean every 5 minute
 
         // Start the cleaning interval
         this.startCleaning();
